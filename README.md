@@ -1,2 +1,3 @@
 # Rougelike
-roguelike game
+a roguelike game
+heavily inspired by balatro.
