@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Roguelike Card Adventure - Advanced Artifacts</title>
+    <style>
+        /* ... (CSS remains the same as the previous version) ... */
+         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; background-color: #2c2c2c; color: #eee; padding-top: 20px; overflow-x: hidden; }
+         #game-container { display: flex; flex-direction: column; align-items: center; background-color: #444; padding: 20px; border-radius: 10px; box-shadow: 0 0 15px rgba(0, 0, 0, 0.6); width: 90%; max-width: 900px; position: relative; overflow: hidden; }
+         #status-area, #enemy-area, #hand-area, #action-area, #log-area, #artifact-area, #end-game-area { width: 100%; margin-bottom: 15px; padding: 10px; background-color: rgba(85, 85, 85, 0.8); border-radius: 5px; z-index: 1; position: relative; transition: transform 0.1s ease-in-out; }
+         #status-area { display: flex; justify-content: space-around; align-items: center; flex-wrap: wrap; min-height: 80px; gap: 10px; }
+         #enemy-area { display: flex; flex-direction: column; align-items: center; background-color: rgba(74, 74, 74, 0.8); min-height: 120px; padding-top: 5px; gap: 5px; }
+         #hand-area { display: flex; flex-wrap: wrap; justify-content: center; min-height: 120px; gap: 8px; position: relative; padding-bottom: 10px; }
+         #discard-pile-visual { position: absolute; bottom: 5px; right: 10px; width: 60px; height: 90px; background-color: #333; border: 2px dashed #666; border-radius: 5px; text-align: center; line-height: 90px; font-size: 0.8em; color: #888; z-index: 0; }
+         #action-area { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+         #action-buttons { display: flex; justify-content: center; gap: 15px;}
+         #log-area { max-height: 100px; overflow-y: auto; font-size: 0.9em; background-color: #3a3a3a; border: 1px solid #666; }
+         #log-area p { margin: 2px 0; border-bottom: 1px dashed #555; padding-bottom: 2px; } #log-area p:last-child { border-bottom: none; }
+         #artifact-area, #end-game-area { text-align: center; }
+         .health-bar-container { width: 150px; height: 20px; background-color: #770000; border: 1px solid #aaa; border-radius: 5px; overflow: hidden; position: relative; }
+         .health-bar { height: 100%; background-color: #00cc00; width: 100%; transition: width 0.5s ease-in-out; position: absolute; left: 0; top: 0; }
+         .health-text { position: absolute; width: 100%; text-align: center; font-size: 0.8em; font-weight: bold; color: white; text-shadow: 1px 1px 1px black; line-height: 20px; z-index: 1; }
+         .card { border: 1px solid #aaa; border-radius: 5px; padding: 15px 8px; min-width: 60px; text-align: center; background-color: #f0f0f0; color: #333; cursor: pointer; user-select: none; transition: transform 0.1s ease-in-out, border-color 0.1s ease-in-out, opacity 0.3s ease-out; font-size: 1.2em; font-weight: bold; position: relative; z-index: 2; box-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
+         .card.red { color: #cc0000; } .card.black { color: #000000; }
+         .card.selected { border-color: #ffcc00; border-width: 3px; transform: translateY(-5px); box-shadow: 0 4px 8px rgba(255, 204, 0, 0.4); }
+         button { padding: 10px 20px; font-size: 1em; border: none; border-radius: 5px; background-color: #6a8acd; color: white; cursor: pointer; transition: background-color 0.2s, opacity 0.2s; min-width: 160px; text-align: center; }
+         button:hover { background-color: #8fa9e0; }
+         button:disabled { background-color: #999; cursor: not-allowed; opacity: 0.6; }
+         #player-artifact-icons { display: flex; gap: 8px; justify-content: center; flex-basis: 100%; order: 3; margin-top: 5px; }
+         .artifact-icon { width: 30px; height: 30px; border-radius: 50%; background-color: #a0a0a0; border: 1px solid #ccc; box-shadow: inset 1px 1px 3px rgba(0,0,0,0.4); display: flex; justify-content: center; align-items: center; font-size: 0.7em; font-weight: bold; color: #333; position: relative; }
+         .artifact-icon.artifact-active { animation: pulse 0.5s ease-in-out; }
+         .artifact-option { border: 2px solid #aaa; background-color: #666; padding: 10px; margin: 5px; border-radius: 5px; cursor: pointer; transition: background-color 0.2s, border-color 0.2s; }
+         .artifact-option:hover { background-color: #777; border-color: #ffcc00; }
+         .artifact-option h4 { margin: 0 0 5px 0; color: #ffdd57;} .artifact-option p { margin: 0; font-size: 0.9em;}
+         #enemy-sprite { width: 60px; height: 60px; background-color: #c54b4b; border-radius: 8px; border: 2px solid #8b3d3d; margin-bottom: 5px; position: relative; transition: transform 0.1s ease-in-out; animation: idleBob 2s ease-in-out infinite; }
+         @keyframes idleBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+         @keyframes attackLunge { 0% { transform: translateX(0) scale(1); } 40% { transform: translateX(-15px) scale(1.1); } 100% { transform: translateX(0) scale(1); } }
+         @keyframes hurtFlash { 0%, 100% { background-color: initial; transform: translateX(0);} 25% { background-color: white; transform: translateX(-2px);} 50% { background-color: white; transform: translateX(2px);} 75% { background-color: white; transform: translateX(-2px);} }
+         @keyframes playerHurtFlash { 0%, 100% { transform: translateX(0); box-shadow: none; } 25%, 75% { transform: translateX(-3px); box-shadow: 0 0 10px rgba(255, 0, 0, 0.7); } 50% { transform: translateX(3px); box-shadow: 0 0 10px rgba(255, 0, 0, 0.7); } }
+         @keyframes cardFly { to { opacity: 0; transform: var(--target-transform); } }
+         @keyframes fadeInOut { 0% { opacity: 0; transform: translateY(10px); } 20% { opacity: 1; transform: translateY(0); } 80% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-10px); } }
+         @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.15); } }
+         .enemy-idle #enemy-sprite { animation: idleBob 2s ease-in-out infinite; }
+         .enemy-attacking #enemy-sprite { animation: attackLunge 0.5s ease-in-out forwards; }
+         .is-hurt { animation: hurtFlash 0.3s ease-in-out; }
+         #status-area.is-hurt { animation: playerHurtFlash 0.3s ease-in-out; }
+         .card-attacking { animation: cardFly 0.6s ease-in forwards; z-index: 10; pointer-events: none; }
+         .card-discarding { animation: cardFly 0.5s ease-out forwards; z-index: 10; pointer-events: none; }
+         .damage-popup { position: absolute; padding: 5px 10px; background-color: rgba(255, 0, 0, 0.85); color: white; font-weight: bold; border-radius: 4px; border: 1px solid #ffcccc; font-size: 1em; text-shadow: 1px 1px 1px black; z-index: 100; pointer-events: none; animation: fadeInOut 1.5s ease-out forwards; min-width: 60px; max-width: 350px; text-align: center; line-height: 1.3; }
+         .damage-popup.score { background-color: rgba(255, 215, 0, 0.9); color: black; text-shadow: none; border-color: white; }
+         .hidden { display: none !important; }
+         h2, h3 { margin-top: 0; text-align: center;} h3 { margin-bottom: 5px;}
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <h1>Roguelike Card Adventure</h1>
+        <button id="start-button">Start New Game</button>
+        <div id="game-content" class="hidden">
+             <div id="status-area"> <div><h3>Player</h3> <div class="health-bar-container"><div id="player-health-bar" class="health-bar"></div><span id="player-health-text" class="health-text">100/100</span></div> <div id="player-artifacts" style="font-size: 0.8em; margin-top: 5px; text-align: center;">Artifacts: None</div> <div id="player-artifact-icons"></div> </div> <div> Deck: <span id="deck-count">52</span> | Discard: <span id="discard-count">0</span></div> <div id="free-discard-info" style="margin-top: 5px;">Free Discards: 0</div> </div>
+             <div id="enemy-area"> <div id="enemy-sprite"></div> <div> <h3 id="enemy-name">Enemy</h3> <div class="health-bar-container"><div id="enemy-health-bar" class="health-bar"></div><span id="enemy-health-text" class="health-text">??/??</span></div> <p id="enemy-ability" style="font-size: 0.9em; margin-top: 5px;">Ability: ???</p> <p id="enemy-attack-info" style="font-size: 0.9em;">Next Attack: ???</p> </div> </div>
+             <div id="hand-area"></div> <div id="discard-pile-visual">Discard</div>
+             <div id="action-area"> <div id="action-buttons"> <button id="play-button" disabled>Play Selected (0)</button> <button id="discard-button" disabled>Discard Selected (0)</button> </div> </div>
+             <div id="log-area"></div>
+             <div id="artifact-area" class="hidden"><h2>Battle Won! Choose an Artifact:</h2><div id="artifact-options"></div></div>
+             <div id="end-game-area" class="hidden"><h2 id="end-game-message">Game Over!</h2><button id="restart-button">Play Again?</button></div>
+        </div>
+    </div>
+
+    <script>
+        // --- Constants and Global Variables ---
+        const suits = ["H", "D", "C", "S"]; const ranks = ["2", "3", "4", "5", "6", "7", "8", "9", "T", "J", "Q", "K", "A"];
+        const rankValues = { "2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7, "8": 8, "9": 9, "T": 10, "J": 10, "Q": 10, "K": 10, "A": 11 };
+        const suitSymbols = { "H": "♥", "D": "♦", "C": "♣", "S": "♠" };
+        const handScores = { "Royal Flush": 250, "Straight Flush": 150, "Four of a Kind": 100, "Full House": 70, "Flush": 50, "Straight": 40, "Three of a Kind": 30, "Two Pair": 20, "One Pair": 10, "High Card": 0 };
+        const ANIMATION_CARD_PLAY_DURATION = 600; const ANIMATION_CARD_DISCARD_DURATION = 500; const ANIMATION_ENEMY_ATTACK_DURATION = 500; const ANIMATION_HURT_DURATION = 300; const ANIMATION_POPUP_DURATION = 1500; const ANIMATION_ARTIFACT_PULSE_DURATION = 500; const ENEMY_TURN_DELAY = 300;
+
+        let deck = []; let hand = []; let discardPile = []; let selectedCardsIndices = [];
+        let player = { hp: 100, maxHp: 100, artifacts: [] }; let enemies = []; let currentEnemyIndex = 0;
+        let playerAttackCountThisEnemy = 0; let freeDiscardsRemaining = 0; let gameState = 'start';
+        let isAnimating = false;
+
+        // --- DOM Elements ---
+        const gameContainer = document.getElementById('game-container'); const startButton = document.getElementById('start-button'); const gameContent = document.getElementById('game-content');
+        const playerHealthBar = document.getElementById('player-health-bar'); const playerHealthText = document.getElementById('player-health-text'); const playerArtifactsDiv = document.getElementById('player-artifacts');
+        const playerArtifactIconsDiv = document.getElementById('player-artifact-icons'); const deckCountSpan = document.getElementById('deck-count'); const discardCountSpan = document.getElementById('discard-count');
+        const freeDiscardInfo = document.getElementById('free-discard-info'); const enemyArea = document.getElementById('enemy-area'); const enemySprite = document.getElementById('enemy-sprite');
+        const enemyNameH3 = document.getElementById('enemy-name'); const enemyHealthBar = document.getElementById('enemy-health-bar'); const enemyHealthText = document.getElementById('enemy-health-text');
+        const enemyAbilityP = document.getElementById('enemy-ability'); const enemyAttackInfoP = document.getElementById('enemy-attack-info'); const handArea = document.getElementById('hand-area');
+        const discardPileVisual = document.getElementById('discard-pile-visual'); const playButton = document.getElementById('play-button'); const discardButton = document.getElementById('discard-button');
+        const logArea = document.getElementById('log-area'); const artifactArea = document.getElementById('artifact-area');
+        const endGameArea = document.getElementById('end-game-area'); const statusArea = document.getElementById('status-area');
+
+        // --- Enemy Definitions ---
+        function defineEnemies() { return [ { name: "Goblin Grunt", hp: 150, maxHp: 150, attacksNeeded: 2, attackPattern: (c) => 20 + c * 5, abilityDesc: "Basic attack increases slightly each turn.", ability: () => {}, sprite: 'goblin' }, { name: "Orc Brute", hp: 300, maxHp: 300, attacksNeeded: 3, attackPattern: (c) => 45 + c * 2, abilityDesc: "Hits hard initially.", ability: () => {}, sprite: 'orc' }, { name: "Slime Cube", hp: 200, maxHp: 200, attacksNeeded: 2, attackPattern: (c) => 15 + c * 10, abilityDesc: "Weak start, dangerous if left alive.", ability: (e, p) => { if (e.hp < e.maxHp / 2 && Math.random() < 0.2) { const h = 25; e.hp = Math.min(e.maxHp, e.hp + h); logMessage(`The ${e.name} quivers and heals ${h} HP!`); updateEnemyStatus(); createDamagePopup(enemySprite, `+${h}`, 'heal');}}, sprite: 'slime' }, { name: "Shadow Mage", hp: 250, maxHp: 250, attacksNeeded: 3, attackPattern: (c) => 35 + c * 8, abilityDesc: "Occasionally drains player health.", ability: (e, p) => { if (Math.random() < 0.20) { const d = 15; logMessage(`The ${e.name} casts Drain Life!`); dealDamageToPlayer(d, false); e.hp = Math.min(e.maxHp, e.hp + d); updateEnemyStatus(); createDamagePopup(enemySprite, `+${d}`, 'heal'); }}, sprite: 'mage' }, { name: "The Card Master", hp: 500, maxHp: 500, attacksNeeded: 1, attackPattern: (c) => 60 + c * 5, abilityDesc: "Final Boss! Powerful and relentless.", ability: () => {}, sprite: 'boss' } ]; }
+
+        // --- REVAMPED Artifact Definitions ---
+        const artifactPool = [
+            { id: "hp_boost", name: "Tough Leather", description: "Increase Max HP by 25.", apply: (p) => { p.maxHp += 25; p.hp += 25; p.artifacts.push({id: "hp_boost"}); }, icon: '❤️' },
+            { id: "four_card_flush", name: "Sapphire Lens", description: "Flushes now only require 4 cards.", apply: (p) => p.artifacts.push({id: "four_card_flush", mod: -1}), icon: '💎' },
+            { id: "gapped_straight", name: "Tome of Trickery", description: "Straights can have a 1-rank gap (e.g., 5-6-8-9).", apply: (p) => p.artifacts.push({id: "gapped_straight", mod: 1}), icon: '📖' },
+            { id: "face_card_boost", name: "Royal Signet", description: "Face cards (J, Q, K) are worth 5 extra points.", apply: (p) => p.artifacts.push({id: "face_card_boost", mod: 5}), icon: '👑' },
+            { id: "heart_boost", name: "Ruby Heart", description: "Cards with the ♥ suit are worth double points.", apply: (p) => p.artifacts.push({id: "heart_boost", mod: 2}), icon: '💖' },
+            { id: "red_card_double", name: "Crimson Bracers", description: "Red cards (♥, ♦) worth double. Black cards (♣, ♠) worth half.", apply: (p) => p.artifacts.push({id: "red_card_double", mod: 2}), icon: '❤️♦️' },
+            { id: "base_dmg_boost", name: "Weighted Knuckles", description: "+3 damage to every attack.", apply: (p) => p.artifacts.push({id: "base_dmg_boost", mod: 3}), icon: '✊' },
+            { id: "berserkers_pact", name: "Berserker's Pact", description: "Deal 50% more damage, but also take 50% more damage.", apply: (p) => p.artifacts.push({id: "berserkers_pact", mod: 1.5}), icon: '💥' },
+            { id: "heal_passive", name: "Soothing Balm", description: "Heal 8 HP after each battle.", apply: (p) => p.artifacts.push({id: "heal_passive", mod: 8}), icon: '🌿' }
+        ];
+        
+        // --- Core Game Logic ---
+        function createDeck() { deck = []; for (const s of suits) for (const r of ranks) deck.push({ suit: s, rank: r, display: r + suitSymbols[s], color: (s === "H" || s === "D") ? 'red' : 'black' }); }
+        function shuffleDeck() { for (let i = deck.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [deck[i], deck[j]] = [deck[j], deck[i]]; } }
+        function drawCards(numCards) { const d = []; for (let i = 0; i < numCards; i++) { if (deck.length === 0) { if (discardPile.length === 0) { logMessage("Deck and discard pile empty!"); break; } logMessage("Reshuffling discard pile into deck."); deck = [...discardPile]; discardPile = []; shuffleDeck(); } if (deck.length > 0) { d.push(deck.pop()); } else { break; } } hand.push(...d); updateCounts(); }
+        function performLogicalDiscard(indices) { const c = []; indices.sort((a, b) => b - a); for (const i of indices) { if (i >= 0 && i < hand.length) { c.push(hand.splice(i, 1)[0]); } } discardPile.push(...c); selectedCardsIndices = []; updateCounts(); return c; }
+
+        // --- MODIFIED Hand Evaluation ---
+        function evaluateHand(playedCards) {
+            if (!playedCards || playedCards.length === 0) return { handType: "None", score: 0, cardValueSum: 0, contributingArtifacts: [] };
+            
+            // Artifact flags
+            const hasArtifact = (id) => player.artifacts.some(a => a.id === id);
+            const flushRequirement = hasArtifact('four_card_flush') ? 4 : 5;
+            const allowsGappedStraight = hasArtifact('gapped_straight');
+
+            // Apply card value modifications from artifacts
+            let cardValueSum = playedCards.reduce((sum, card) => {
+                let cardValue = rankValues[card.rank];
+                if (hasArtifact('face_card_boost') && ['J', 'Q', 'K'].includes(card.rank)) cardValue += 5;
+                if (hasArtifact('heart_boost') && card.suit === 'H') cardValue *= 2;
+                if (hasArtifact('red_card_double')) {
+                    if (card.color === 'red') cardValue *= 2;
+                    else cardValue = Math.ceil(cardValue / 2);
+                }
+                return sum + cardValue;
+            }, 0);
+
+            let handType = "High Card";
+            let score = 0;
+            const numPlayed = playedCards.length;
+            const ranksArr = playedCards.map(c => c.rank).sort((a, b) => ranks.indexOf(a) - ranks.indexOf(b));
+            const suitsArr = playedCards.map(c => c.suit);
+            const rankCounts = ranksArr.reduce((counts, rank) => { counts[rank] = (counts[rank] || 0) + 1; return counts; }, {});
+            const counts = Object.values(rankCounts).sort((a, b) => b - a);
+            
+            // Hand Type Checks
+            let isFlush = new Set(suitsArr).size === 1 && numPlayed >= flushRequirement;
+            let isStraight = false;
+            const uniqueRankIndices = [...new Set(ranksArr.map(r => ranks.indexOf(r)))].sort((a,b) => a-b);
+            if (uniqueRankIndices.length >= 4) { // Straights need at least 4 cards
+                // Standard straight check
+                if (uniqueRankIndices.length === 5 && uniqueRankIndices[4] - uniqueRankIndices[0] === 4) isStraight = true;
+                // Ace-low straight (A-2-3-4-5)
+                const aceLowIndices = [0, 1, 2, 3, 12];
+                if (uniqueRankIndices.length === 5 && uniqueRankIndices.every((val, index) => aceLowIndices.includes(val))) isStraight = true;
+                // Gapped straight check (artifact)
+                if (!isStraight && allowsGappedStraight && uniqueRankIndices.length >= 4) {
+                    let gaps = 0;
+                    for(let i = 0; i < uniqueRankIndices.length - 1; i++) {
+                        const diff = uniqueRankIndices[i+1] - uniqueRankIndices[i];
+                        if (diff > 1) gaps += (diff - 1);
+                    }
+                    if (gaps <= 1 && uniqueRankIndices[uniqueRankIndices.length-1] - uniqueRankIndices[0] - (uniqueRankIndices.length - 1) <= 1) isStraight = true;
+                }
+            }
+
+            // Determine hand type and score
+            if (isStraight && isFlush && numPlayed >= Math.max(4, flushRequirement)) { // Royal/Straight Flush
+                 const highRanks = ['T', 'J', 'Q', 'K', 'A']; if (ranksArr.every(r => highRanks.includes(r))) { handType = "Royal Flush"; } else { handType = "Straight Flush"; }
+            } else if (counts[0] === 4) { handType = "Four of a Kind";
+            } else if (counts[0] === 3 && counts[1] === 2) { handType = "Full House";
+            } else if (isFlush) { handType = "Flush";
+            } else if (isStraight) { handType = "Straight";
+            } else if (counts[0] === 3) { handType = "Three of a Kind";
+            } else if (counts[0] === 2 && counts[1] === 2) { handType = "Two Pair";
+            } else if (counts[0] === 2) { handType = "One Pair"; }
+            
+            score = handScores[handType] || 0;
+            
+            let artifactBonus = 0;
+            let contributingArtifacts = [];
+            // Base damage boost is always applied
+            player.artifacts.filter(a => a.id === 'base_dmg_boost').forEach(a => { artifactBonus += a.mod; contributingArtifacts.push(a.id); });
+            
+            let totalScore = score + cardValueSum + artifactBonus;
+
+            // Apply Berserker's Pact at the end
+            if (hasArtifact('berserkers_pact')) {
+                totalScore = Math.round(totalScore * 1.5);
+                contributingArtifacts.push('berserkers_pact');
+            }
+
+            // Log contributing artifacts if a hand was made
+            if (handType !== 'High Card') {
+                if (isFlush && hasArtifact('four_card_flush')) contributingArtifacts.push('four_card_flush');
+                if (isStraight && allowsGappedStraight) contributingArtifacts.push('gapped_straight');
+            }
+             if (playedCards.some(c => hasArtifact('face_card_boost') && ['J', 'Q', 'K'].includes(c.rank))) contributingArtifacts.push('face_card_boost');
+             if (playedCards.some(c => c.suit === 'H' && hasArtifact('heart_boost'))) contributingArtifacts.push('heart_boost');
+             if (playedCards.some(c => c.color === 'red' && hasArtifact('red_card_double'))) contributingArtifacts.push('red_card_double');
+
+
+            return { handType, score: totalScore, cardValueSum, contributingArtifacts: [...new Set(contributingArtifacts)] };
+        }
+
+        // --- MODIFIED: Function to generate detailed damage string ---
+        function generateDamageBreakdownString(evaluation) {
+            const parts = [];
+            const handTypeScore = handScores[evaluation.handType] || 0;
+
+            if (evaluation.cardValueSum > 0) parts.push(`${evaluation.cardValueSum} (Cards)`);
+            if (handTypeScore > 0) parts.push(`${handTypeScore} (${evaluation.handType})`);
+
+            // Collect bonuses from artifacts that modify base damage or card values
+            const artifactBonuses = {};
+            evaluation.contributingArtifacts.forEach(id => {
+                const artifact = player.artifacts.find(pa => pa.id === id);
+                const artifactDef = artifactPool.find(ap => ap.id === id);
+                if (artifact && artifactDef && typeof artifact.mod === 'number' && artifact.id !== 'berserkers_pact') {
+                     artifactBonuses[artifactDef.name] = (artifactBonuses[artifactDef.name] || 0) + artifact.mod;
+                }
+            });
+            for (const [name, bonus] of Object.entries(artifactBonuses)) {
+                 if (bonus > 0) parts.push(`${bonus} (${name})`);
+            }
+            let baseTotal = parts.reduce((sum, part) => sum + parseInt(part), 0);
+
+            // Handle rule-changing artifacts and multipliers separately
+            evaluation.contributingArtifacts.forEach(id => {
+                const artifactDef = artifactPool.find(ap => ap.id === id);
+                if(artifactDef && !parts.some(p => p.includes(artifactDef.name))) {
+                    if(id === 'berserkers_pact') {
+                        // This shows the multiplier effect
+                        parts.push(`<br>x1.5 (${artifactDef.name})`);
+                    } else if (!artifactBonuses[artifactDef.name]) {
+                        // This shows rule changes like "4-Card Flush"
+                        parts.push(`${artifactDef.name}`);
+                    }
+                }
+            });
+            
+            if (parts.length <= 1 && !evaluation.contributingArtifacts.includes('berserkers_pact')) {
+                 return `-${evaluation.score}`;
+            }
+
+            return `-${evaluation.score}<br><span style="font-size: 0.8em; font-weight: normal;">(${parts.join(' + ')})</span>`;
+        }
+
+        // --- Animation & Combat Logic (createDamagePopup is modified in CSS) ---
+        function createDamagePopup(targetElement, html, type = 'damage') { const p=document.createElement('div');p.classList.add('damage-popup');if(type==='score'||type==='heal')p.classList.add('score');p.innerHTML=html;const tr=targetElement.getBoundingClientRect();const cr=gameContainer.getBoundingClientRect();const px=tr.left-cr.left+tr.width/2;const py=tr.top-cr.top-10;p.style.left=`${px}px`;p.style.top=`${py}px`;p.style.transform='translateX(-50%)';gameContainer.appendChild(p);setTimeout(()=>{p.remove();},ANIMATION_POPUP_DURATION); }
+        function animateCards(cardElements, targetElement, animationClass, duration) { return new Promise(r=>{if(!cardElements||cardElements.length===0){r();return;}const tr=targetElement.getBoundingClientRect();const hr=handArea.getBoundingClientRect();cardElements.forEach((c,i)=>{const cr=c.getBoundingClientRect();const tx=tr.left+tr.width/2-cr.left-cr.width/2;const ty=tr.top+tr.height/2-cr.top-cr.height/2;c.style.setProperty('--target-transform',`translate(${tx}px,${ty}px) scale(0.3)`);c.classList.add(animationClass);});setTimeout(r,duration);}); }
+        function performFreeDiscard() { if (isAnimating) return; if (selectedCardsIndices.length===0||selectedCardsIndices.length>5){logMessage("Select 1-5 cards.");return;} if (freeDiscardsRemaining<=0){logMessage("No free discards.");return;} isAnimating = true; updateActionButtons(); const indices= [...selectedCardsIndices]; const elements=indices.map(i=>handArea.querySelector(`.card[data-index="${i}"]`)).filter(el=>el); animateCards(elements, discardPileVisual, 'card-discarding', ANIMATION_CARD_DISCARD_DURATION) .then(() => { const discarded=performLogicalDiscard(indices); logMessage(`Used free discard for: ${discarded.map(c => c.display).join(', ')}.`); freeDiscardsRemaining--; const toDraw = 8 - hand.length; if (toDraw > 0) drawCards(toDraw); updateHandUI(); updateFreeDiscardUI(); isAnimating = false; updateActionButtons(); }); }
+
+        // --- Player Turn Logic ---
+        function playerTurn(action) {
+            if (isAnimating) return;
+            if (action === 'discard' && freeDiscardsRemaining > 0) { performFreeDiscard(); return; }
+            if (selectedCardsIndices.length === 0 || selectedCardsIndices.length > 5) { logMessage("Select 1-5 cards."); return; }
+
+            isAnimating = true; updateActionButtons();
+            const indicesToProcess = [...selectedCardsIndices];
+            const cardElementsToAnimate = indicesToProcess.map(index => handArea.querySelector(`.card[data-index="${index}"]`)).filter(el => el);
+            const selectedCardsObjects = indicesToProcess.map(index => hand[index]);
+            let evaluation = { score: 0, handType: "None", contributingArtifacts: [] };
+            let animationDuration = ANIMATION_CARD_DISCARD_DURATION; let animationClass = 'card-discarding'; let targetElement = discardPileVisual;
+
+            if (action === 'play') {
+                evaluation = evaluateHand(selectedCardsObjects);
+                if (evaluation.score > 0) { playerAttackCountThisEnemy++; }
+                logMessage(`You played ${selectedCardsObjects.map(c => c.display).join(', ')}.`);
+                animationDuration = ANIMATION_CARD_PLAY_DURATION; animationClass = 'card-attacking'; targetElement = enemySprite;
+                if (evaluation.score > 0) logMessage(`Hand: ${evaluation.handType} (Score: ${evaluation.score})`);
+                else logMessage(`Played cards yield no score.`);
+            } else {
+                logMessage(`You discarded ${selectedCardsObjects.map(c => c.display).join(', ')} (ends turn).`);
+                playerAttackCountThisEnemy++;
+            }
+
+            animateCards(cardElementsToAnimate, targetElement, animationClass, animationDuration)
+                .then(() => {
+                    performLogicalDiscard(indicesToProcess);
+                    if (action === 'play' && evaluation.score > 0) {
+                        dealDamageToEnemy(evaluation.score);
+                        enemySprite.classList.add('is-hurt'); setTimeout(() => enemySprite.classList.remove('is-hurt'), ANIMATION_HURT_DURATION);
+                        const damageText = generateDamageBreakdownString(evaluation); createDamagePopup(enemySprite, damageText); 
+                        evaluation.contributingArtifacts.forEach(id => {
+                            const icon = playerArtifactIconsDiv.querySelector(`[data-artifact-id="${id}"]`);
+                            if (icon) { icon.classList.add('artifact-active'); setTimeout(() => icon.classList.remove('artifact-active'), ANIMATION_ARTIFACT_PULSE_DURATION); }
+                        });
+                    }
+                    const cardsToDraw = 8 - hand.length; if (cardsToDraw > 0) drawCards(cardsToDraw);
+                    updateHandUI();
+                    const enemy = enemies[currentEnemyIndex];
+                    if (enemy.hp <= 0) {
+                        logMessage(`You defeated the ${enemy.name}!`);
+                        const healArtifact = player.artifacts.find(a => a.id === 'heal_passive');
+                        if (healArtifact) { player.hp = Math.min(player.maxHp, player.hp + healArtifact.mod); logMessage(`Soothing Balm heals you for ${healArtifact.mod} HP.`); }
+                        isAnimating = false;
+                        changeState('artifact');
+                    } else {
+                        updateEnemyStatus();
+                        setTimeout(() => { enemyTurn(); }, ENEMY_TURN_DELAY);
+                    }
+                });
+        }
+        
+        // --- Damage and Enemy Turn Logic ---
+        function dealDamageToEnemy(damage) { const enemy = enemies[currentEnemyIndex]; enemy.hp = Math.max(0, enemy.hp - damage); logMessage(`You dealt ${damage} damage to the ${enemy.name}.`); }
+        function dealDamageToPlayer(damage, triggerUpdate = true) {
+            let finalDamage = damage;
+            if (player.artifacts.some(a => a.id === 'berserkers_pact')) {
+                finalDamage = Math.round(finalDamage * 1.5);
+                logMessage("Berserker's Pact increases damage taken!");
+            }
+            player.hp = Math.max(0, player.hp - finalDamage); logMessage(`The enemy dealt ${finalDamage} damage to you.`);
+            statusArea.classList.add('is-hurt'); setTimeout(() => statusArea.classList.remove('is-hurt'), ANIMATION_HURT_DURATION);
+            createDamagePopup(playerHealthBar.parentElement, `-${finalDamage}`);
+            if (triggerUpdate) updatePlayerStatus();
+            if (player.hp <= 0) { changeState('gameover'); }
+        }
+        function enemyTurn() { if (gameState !== 'battle') { isAnimating = false; updateActionButtons(); return; } const enemy = enemies[currentEnemyIndex]; logMessage(`--- ${enemy.name}'s Turn ---`); let enemyAttackDamage = 0; let proceedToAttackPhase = true; if (typeof enemy.ability === 'function') { enemy.ability(enemy, player); if (player.hp <= 0) { logMessage(`${enemy.name}'s ability defeated you!`); proceedToAttackPhase = false; changeState('gameover'); return; } } updateEnemyStatus(); if (proceedToAttackPhase && playerAttackCountThisEnemy >= enemy.attacksNeeded) { logMessage(`${enemy.name} attacks! (${playerAttackCountThisEnemy}/${enemy.attacksNeeded})`); enemyAttackDamage = enemy.attackPattern(playerAttackCountThisEnemy); enemySprite.classList.remove('enemy-idle'); enemySprite.classList.add('enemy-attacking'); setTimeout(() => { enemySprite.classList.remove('enemy-attacking'); if (enemyAttackDamage > 0 && player.hp > 0) { dealDamageToPlayer(enemyAttackDamage); } if (gameState === 'battle') { playerAttackCountThisEnemy = 0; updateEnemyStatus(); isAnimating = false; updateActionButtons(); } }, ANIMATION_ENEMY_ATTACK_DURATION); } else if (proceedToAttackPhase) { logMessage(`${enemy.name} is preparing... (${playerAttackCountThisEnemy}/${enemy.attacksNeeded} hits received)`); updateEnemyStatus(); isAnimating = false; updateActionButtons(); } else { isAnimating = false; } }
+        
+        // --- Game State and UI Functions ---
+        function startGame() { player={hp:100,maxHp:100,artifacts:[]};enemies=defineEnemies();currentEnemyIndex=0;discardPile=[];hand=[];selectedCardsIndices=[];createDeck();shuffleDeck();drawCards(8);logArea.innerHTML='<p>New game started.</p>';const ao=artifactArea.querySelector('#artifact-options');if(ao)ao.innerHTML='';const em=endGameArea.querySelector('#end-game-message');if(em)em.textContent='';const rb=endGameArea.querySelector('#restart-button');if(rb)rb.textContent='Play Again?';resetEncounterState();changeState('battle');updateHandUI(); }
+        function nextEncounter() { currentEnemyIndex++; if (currentEnemyIndex >= enemies.length) { changeState('win'); } else { logMessage(`Moving on... Encountering ${enemies[currentEnemyIndex].name}!`); resetEncounterState(); changeState('battle'); updateHandUI();} }
+        function resetEncounterState() { playerAttackCountThisEnemy = 0; freeDiscardsRemaining = 2; updateFreeDiscardUI(); if(currentEnemyIndex < enemies.length) updateEnemyStatus(); }
+        function changeState(newState) { if (gameState === 'gameover' || gameState === 'win') return; gameState = newState; artifactArea.classList.add('hidden'); endGameArea.classList.add('hidden'); gameContent.classList.remove('hidden'); startButton.classList.add('hidden'); const setupEndGameArea = (message) => { const msgEl = endGameArea.querySelector('#end-game-message'); const btnEl = endGameArea.querySelector('#restart-button'); if (!msgEl || !btnEl) { endGameArea.innerHTML = `<h2 id="end-game-message">${message}</h2><button id="restart-button">Play Again?</button>`; const newBtnEl = endGameArea.querySelector('#restart-button'); if (newBtnEl) { newBtnEl.addEventListener('click', () => changeState('start')); } } else { msgEl.textContent = message; } endGameArea.classList.remove('hidden'); gameContent.classList.add('hidden'); isAnimating = false; }; switch (gameState) { case 'start': gameContent.classList.add('hidden'); startButton.classList.remove('hidden'); isAnimating=false; break; case 'battle': setupEnemy(); updateUI(); break; case 'artifact': const artifactOpsDiv = artifactArea.querySelector('#artifact-options'); presentArtifactChoices(artifactOpsDiv); artifactArea.classList.remove('hidden'); isAnimating=false; break; case 'gameover': setupEndGameArea("You have been defeated!"); break; case 'win': setupEndGameArea("Congratulations! You defeated all enemies!"); break; } }
+        function updateUI() { updatePlayerStatus(); updateEnemyStatus(); updateCounts(); updateFreeDiscardUI(); updateActionButtons(); }
+        function updatePlayerStatus() { const hp=Math.max(0,(player.hp/player.maxHp)*100);playerHealthBar.style.width=`${hp}%`;playerHealthText.textContent=`${player.hp}/${player.maxHp}`;const an=player.artifacts.map(a=>(artifactPool.find(ap=>ap.id===a.id)||{}).name||a.id).join(', ');playerArtifactsDiv.textContent=`Artifacts:${an||'None'}`;playerArtifactIconsDiv.innerHTML='';player.artifacts.forEach(a=>{const d=artifactPool.find(ap=>ap.id===a.id);if(d){const i=document.createElement('div');i.classList.add('artifact-icon'); i.title=`${d.name}: ${d.description}`;i.textContent=d.icon||'?';i.dataset.artifactId=a.id;playerArtifactIconsDiv.appendChild(i);}}); }
+        function setupEnemy() { if(currentEnemyIndex >= enemies.length) return;const e=enemies[currentEnemyIndex];enemyNameH3.textContent=e.name;enemyAbilityP.textContent=`Ability:${e.abilityDesc}`;enemySprite.className='';enemySprite.style.backgroundColor='#c54b4b';enemySprite.classList.add('enemy-idle');updateEnemyStatus(); }
+        function updateEnemyStatus() { if(currentEnemyIndex >= enemies.length || !enemies[currentEnemyIndex]) return; const enemy = enemies[currentEnemyIndex]; const healthPerc = Math.max(0,(enemy.hp / enemy.maxHp) * 100); enemyHealthBar.style.width = `${healthPerc}%`; enemyHealthText.textContent = `${enemy.hp} / ${enemy.maxHp}`; if (enemy.hp > 0) { const hitsRemaining = Math.max(0, enemy.attacksNeeded - playerAttackCountThisEnemy); if (hitsRemaining === 0) { enemyAttackInfoP.textContent = `Attacks Now!`; } else { const plural = hitsRemaining === 1 ? "" : "s"; enemyAttackInfoP.textContent = `Attacks in: ${hitsRemaining} hit${plural}`; } } else { enemyAttackInfoP.textContent = 'Defeated'; } }
+        function updateHandUI() { handArea.innerHTML='';hand.forEach((c,i)=>{const d=document.createElement('div');d.classList.add('card',c.color);d.textContent=c.display;d.dataset.index=i;if(selectedCardsIndices.includes(i)){d.classList.add('selected');}d.addEventListener('click',handleCardClick);handArea.appendChild(d);});updateActionButtons();}
+        function updateActionButtons() { const n=selectedCardsIndices.length;const c=!isAnimating&&n>0&&n<=5&&gameState==='battle';playButton.disabled=!c;discardButton.disabled=!c;playButton.style.opacity=playButton.disabled?'0.6':'1';discardButton.style.opacity=discardButton.disabled?'0.6':'1';playButton.textContent=`Play Selected (${n})`;if(c&&freeDiscardsRemaining>0){discardButton.textContent=`Free Discard (${n}) - ${freeDiscardsRemaining} left`;}else{discardButton.textContent=`Discard Selected (${n})`;}}
+        function updateCounts() { deckCountSpan.textContent = deck.length; discardCountSpan.textContent = discardPile.length; }
+        function updateFreeDiscardUI() { freeDiscardInfo.textContent = `Free Discards: ${freeDiscardsRemaining}`; }
+        function logMessage(message) { const p = document.createElement('p'); p.textContent = message; logArea.appendChild(p); logArea.scrollTop = logArea.scrollHeight; }
+        function handleCardClick(event) { if (isAnimating || gameState !== 'battle') { return; } const cardDiv = event.target.closest('.card'); if (!cardDiv) return; const index = parseInt(cardDiv.dataset.index); if (isNaN(index)) return; const selectedIndexPos = selectedCardsIndices.indexOf(index); if (selectedIndexPos > -1) { selectedCardsIndices.splice(selectedIndexPos, 1); cardDiv.classList.remove('selected'); } else { if (selectedCardsIndices.length < 5) { selectedCardsIndices.push(index); cardDiv.classList.add('selected'); } else { logMessage("Max 5 cards."); } } updateActionButtons(); }
+        function presentArtifactChoices(optionsContainer) { if (!optionsContainer) { console.error("Artifact options container not found!"); return; } optionsContainer.innerHTML = ''; const availableArtifacts = artifactPool.filter(ap => !player.artifacts.some(pa => pa.id === ap.id)); availableArtifacts.sort(() => 0.5 - Math.random()); const choices = availableArtifacts.slice(0, 3); if (choices.length === 0) { optionsContainer.innerHTML = "<div>No more artifacts available!</div><button onclick='nextEncounter()'>Continue</button>"; return; } choices.forEach(artifact => { const div = document.createElement('div'); div.classList.add('artifact-option'); div.innerHTML = `<h4>${artifact.name} (${artifact.icon || ''})</h4><p>${artifact.description}</p>`; div.onclick = () => selectArtifact(artifact); optionsContainer.appendChild(div); }); }
+        function selectArtifact(artifact) { logMessage(`Artifact chosen: ${artifact.name}!`); artifact.apply(player); updatePlayerStatus(); artifactArea.classList.add('hidden'); nextEncounter(); }
+        
+        // --- Initialization ---
+         document.addEventListener('DOMContentLoaded', (event) => {
+             const artifactOpsDiv = artifactArea.querySelector('#artifact-options'); if (!artifactOpsDiv) { artifactArea.innerHTML = '<h2>Battle Won! Choose an Artifact:</h2><div id="artifact-options"></div>'; }
+             const endMsgEl = endGameArea.querySelector('#end-game-message'); const endBtnEl = endGameArea.querySelector('#restart-button'); if (!endMsgEl || !endBtnEl) { endGameArea.innerHTML = '<h2 id="end-game-message"></h2><button id="restart-button">Play Again?</button>'; }
+             const restartBtn = endGameArea.querySelector('#restart-button');
+             startButton.addEventListener('click', startGame);
+             if (restartBtn) { restartBtn.addEventListener('click', () => { changeState('start'); }); }
+             playButton.addEventListener('click', () => playerTurn('play'));
+             discardButton.addEventListener('click', () => playerTurn('discard'));
+             logMessage("Welcome! Click 'Start New Game' to begin.");
+             changeState('start');
+         });
+    </script>
+</body>
+</html>
